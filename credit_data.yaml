@@ -3,25 +3,56 @@ customer_pb_limits:
     pb_id: "PB_A"
     limit_amount: 1000000
     currency: "USD"
-    last_updated: "2025-05-27T10:00:00Z"
+    last_updated: "2024-01-15T08:00:00Z"
   - customer_id: "Cust_1"
     pb_id: "PB_B"
     limit_amount: 500000
     currency: "USD"
-    last_updated: "2025-05-27T10:01:00Z"
+    last_updated: "2024-01-15T08:00:00Z"
   - customer_id: "Cust_2"
     pb_id: "PB_A"
     limit_amount: 2000000
     currency: "USD"
-    last_updated: "2025-05-27T09:30:00Z"
+    last_updated: "2024-01-15T08:00:00Z"
+  - customer_id: "Cust_2"
+    pb_id: "CPB_1"
+    limit_amount: 1500000
+    currency: "USD"
+    last_updated: "2024-01-15T08:00:00Z"
+  - customer_id: "Cust_3"
+    pb_id: "PB_B"
+    limit_amount: 800000
+    currency: "USD"
+    last_updated: "2024-01-15T08:00:00Z"
+  - customer_id: "Cust_3"
+    pb_id: "CPB_1"
+    limit_amount: 2500000
+    currency: "USD"
+    last_updated: "2024-01-15T08:00:00Z"
+  - customer_id: "Cust_4"
+    pb_id: "PB_A"
+    limit_amount: 1200000
+    currency: "USD"
+    last_updated: "2024-01-15T08:00:00Z"
+  - customer_id: "Cust_4"
+    pb_id: "PB_B"
+    limit_amount: 600000
+    currency: "USD"
+    last_updated: "2024-01-15T08:00:00Z"
+  - customer_id: "Cust_4"
+    pb_id: "CPB_1"
+    limit_amount: 3000000
+    currency: "USD"
+    last_updated: "2024-01-15T08:00:00Z"
+
 pb_to_central_pb_limits:
   - non_central_pb_id: "PB_A"
     central_pb_id: "CPB_1"
     limit_amount: 5000000
     currency: "USD"
-    last_updated: "2025-05-27T08:00:00Z"
+    last_updated: "2024-01-15T08:00:00Z"
   - non_central_pb_id: "PB_B"
     central_pb_id: "CPB_1"
     limit_amount: 3000000
     currency: "USD"
-    last_updated: "2025-05-27T08:05:00Z" 
+    last_updated: "2024-01-15T08:00:00Z" 

@@ -52,17 +52,6 @@ credit_data_str = data_to_yaml_string(credit_data)
 st.title("FX Credit Configuration Schema Viewer")
 
 
-# Show file loading status
-if all([prime_brokers_data, customers_data, sessions_data, credit_data]):
-    st.success("✅ All configuration files loaded successfully")
-    with st.expander("File Loading Details", expanded=False):
-        st.write("**Loaded Files:**")
-        st.write(f"• `prime_brokers.yaml` - {len(prime_brokers_data)} prime brokers")
-        st.write(f"• `customers.yaml` - {len(customers_data)} customers") 
-        st.write(f"• `sessions.yaml` - {len(sessions_data)} sessions")
-        st.write(f"• `credit_data.yaml` - {len(credit_data.get('customer_pb_limits', []))} customer limits, {len(credit_data.get('pb_to_central_pb_limits', []))} PB limits")
-else:
-    st.error("❌ Some configuration files failed to load")
 
 # --- Design Rationale ---
 st.header("Design Rationale")
@@ -80,11 +69,7 @@ with st.expander("Why YAML and this structure?", expanded=False):
 
 # --- Schema Diagram ---
 st.header("Configuration Schema Overview")
-st.markdown("""
-The diagram shows the key relationships for prime brokerage operations. Customers connect to prime brokers 
-through trading sessions, while non-central prime brokers require credit lines with the central prime broker 
-to enable client trading. This two-tier structure is essential for managing operational risk and client onboarding.
-""")
+
 
 # Create a clear 2D diagram using HTML/CSS
 schema_diagram = """
@@ -308,9 +293,9 @@ st.markdown("""
 Defines all prime brokers and identifies the central prime broker. The central PB requirement ensures 
 clear venue connectivity and simplifies credit management during client onboarding.
 
-id: Unique identifier for the prime broker
-name: Full name of the prime broker  
-is_central_pb: Boolean flag, exactly one PB should be true
+**id:** Unique identifier for the prime broker  
+**name:** Full name of the prime broker  
+**is_central_pb:** Boolean flag, exactly one PB should be true
 """)
 with st.expander("View `prime_brokers.yaml` content"):
     st.code(prime_brokers_data_str, language='yaml')
@@ -321,8 +306,8 @@ st.markdown("""
 Customer entities for trading activity. Minimal schema keeps essential identifiers for trade routing 
 while allowing detailed customer data to be managed in dedicated CRM systems.
 
-id: Unique identifier for the customer
-name: Customer entity name
+**id:** Unique identifier for the customer  
+**name:** Customer entity name
 """)
 with st.expander("View `customers.yaml` content"):
     st.code(customers_data_str, language='yaml')
@@ -330,13 +315,13 @@ with st.expander("View `customers.yaml` content"):
 # --- Sessions Configuration ---
 st.header("3. Sessions (`sessions.yaml`)")
 st.markdown("""
-Trading sessions map customers to prime brokers. The 1:1 session-to-PB mapping simplifies credit 
+Trading sessions map customers to prime brokers. 
 attribution and troubleshooting during live trading operations.
 
-session_id: Unique session identifier (e.g., FIX session ID)
-customer_id: Links to customer ID
-pb_id: Links to prime broker ID  
-protocol: Communication protocol (e.g., "FIX 4.2")
+**session_id:** Unique session identifier (e.g., FIX session ID)  
+**customer_id:** Links to customer ID  
+**pb_id:** Links to prime broker ID  
+**protocol:** Communication protocol (e.g., "FIX 4.2")
 """)
 with st.expander("View `sessions.yaml` content"):
     st.code(sessions_data_str, language='yaml')
@@ -345,10 +330,9 @@ with st.expander("View `sessions.yaml` content"):
 st.header("4. Credit Data (`credit_data.yaml`)")
 st.markdown("""
 Credit limit information updated by third-party vendors. Separated from static config due to frequent updates 
-and different security requirements. Critical for preventing trade rejects and managing operational risk.
+and different security requirements. 
 
-Live Updates: Third-party credit vendor integration provides real-time risk assessment but requires 
-fallback procedures and validation to prevent operational disruptions.
+
 """)
 
 st.subheader("4.1 `customer_pb_limits`")
@@ -356,11 +340,11 @@ st.markdown("""
 Direct credit limits between customers and prime brokers. Essential for trade authorization and 
 preventing customer trading disruptions.
 
-customer_id: Links to customer ID
-pb_id: Links to prime broker ID
-limit_amount: Maximum credit amount
-currency: Limit currency (e.g., "USD")
-last_updated: When this limit was last updated
+**customer_id:** Links to customer ID  
+**pb_id:** Links to prime broker ID  
+**limit_amount:** Maximum credit amount  
+**currency:** Limit currency (e.g., "USD")  
+**last_updated:** When this limit was last updated
 """)
 
 st.subheader("4.2 `pb_to_central_pb_limits`")
@@ -368,11 +352,7 @@ st.markdown("""
 Credit lines between non-central prime brokers and the central prime broker. Must be monitored to ensure 
 prime brokers don't over-extend credit to their customers beyond their own capacity.
 
-non_central_pb_id: Non-central PB ID
-central_pb_id: Central PB ID
-limit_amount: Maximum credit amount
-currency: Limit currency
-last_updated: When this limit was last updated
+
 """)
 with st.expander("View `credit_data.yaml` content"):
     st.code(credit_data_str, language='yaml')
@@ -532,39 +512,78 @@ with st.expander("3 - Credit Exposure Check", expanded=False):
     with col1:
         st.markdown("**Customer → PB Limits:**")
         if st.session_state.modified_credit_data and 'customer_pb_limits' in st.session_state.modified_credit_data:
-            for i, limit in enumerate(st.session_state.modified_credit_data['customer_pb_limits']):
+            # Create dropdown options for customer-PB relationships
+            customer_pb_options = []
+            for limit in st.session_state.modified_credit_data['customer_pb_limits']:
+                option_text = f"{limit['customer_id']} → {limit['pb_id']}"
+                customer_pb_options.append(option_text)
+            
+            if customer_pb_options:
+                selected_customer_pb = st.selectbox(
+                    "Select Customer → PB relationship:",
+                    customer_pb_options,
+                    key="customer_pb_selector"
+                )
+                
+                # Find the selected limit
+                selected_index = customer_pb_options.index(selected_customer_pb)
+                selected_limit = st.session_state.modified_credit_data['customer_pb_limits'][selected_index]
+                
+                # Show current limit and allow editing
+                st.write(f"**Current Limit:** ${selected_limit['limit_amount']:,}")
+                
                 new_amount = st.number_input(
-                    f"{limit['customer_id']} → {limit['pb_id']}",
+                    "New Credit Limit ($):",
                     min_value=0,
-                    value=limit['limit_amount'],
+                    value=selected_limit['limit_amount'],
                     step=100000,
-                    key=f"customer_limit_{i}",
+                    key="customer_limit_editor",
                     format="%d"
                 )
                 
-                if new_amount != limit['limit_amount']:
-                    st.session_state.modified_credit_data['customer_pb_limits'][i]['limit_amount'] = new_amount
+                if new_amount != selected_limit['limit_amount']:
+                    st.session_state.modified_credit_data['customer_pb_limits'][selected_index]['limit_amount'] = new_amount
+                    st.success(f"Updated {selected_customer_pb} to ${new_amount:,}")
     
     with col2:
         st.markdown("**PB → Central PB Lines:**")
         if st.session_state.modified_credit_data and 'pb_to_central_pb_limits' in st.session_state.modified_credit_data:
-            for i, limit in enumerate(st.session_state.modified_credit_data['pb_to_central_pb_limits']):
+            # Create dropdown options for PB-Central PB relationships
+            pb_central_options = []
+            for limit in st.session_state.modified_credit_data['pb_to_central_pb_limits']:
+                option_text = f"{limit['non_central_pb_id']} → {limit['central_pb_id']}"
+                pb_central_options.append(option_text)
+            
+            if pb_central_options:
+                selected_pb_central = st.selectbox(
+                    "Select PB → Central PB relationship:",
+                    pb_central_options,
+                    key="pb_central_selector"
+                )
+                
+                # Find the selected limit
+                selected_index = pb_central_options.index(selected_pb_central)
+                selected_limit = st.session_state.modified_credit_data['pb_to_central_pb_limits'][selected_index]
+                
+                # Show current limit and allow editing
+                st.write(f"**Current Limit:** ${selected_limit['limit_amount']:,}")
+                
                 new_amount = st.number_input(
-                    f"{limit['non_central_pb_id']} → {limit['central_pb_id']}",
+                    "New Credit Line ($):",
                     min_value=0,
-                    value=limit['limit_amount'],
+                    value=selected_limit['limit_amount'],
                     step=500000,
-                    key=f"pb_limit_{i}",
+                    key="pb_limit_editor",
                     format="%d"
                 )
                 
-                if new_amount != limit['limit_amount']:
-                    st.session_state.modified_credit_data['pb_to_central_pb_limits'][i]['limit_amount'] = new_amount
+                if new_amount != selected_limit['limit_amount']:
+                    st.session_state.modified_credit_data['pb_to_central_pb_limits'][selected_index]['limit_amount'] = new_amount
+                    st.success(f"Updated {selected_pb_central} to ${new_amount:,}")
     
 
-    if st.button("Save"):
-        st.info("Would update credit_data.yaml in real implementatino but here we just update the session state for ease of deployment")
-    
+    if st.button("Save", help="In production, this would save to credit_data.yaml"):
+        st.info("Would update credit_data.yaml")
 
     st.markdown("---")
     st.markdown("**Credit Exposure Calculator** - Select a prime broker to validate their credit exposure")
@@ -652,12 +671,7 @@ print(f"Valid: {result['is_valid']}")
 print(f"Utilization: {result['utilization']:.1f}%")
     """, language='python')
 
-# Add implementation notes
-st.markdown("---")
-st.markdown("""
-Implementation Notes:
-Use PyYAML library to parse YAML files. Leverage ID-based relationships to join data across files. Implement business logic to ensure credit limits aren't exceeded. In production, load from databases/APIs with caching for performance. Add proper error handling and logging for production use.
-""")
+
 
 # --- Error Handling & Edge Cases ---
 st.header("Error Handling & Edge Cases")
@@ -670,7 +684,11 @@ with st.expander("1 - Basic File Validation", expanded=False):
     st.markdown("""
     YAML files can have syntax errors, be missing, or contain unexpected data. Proper validation prevents crashes and provides clear error messages.
     
-    Key checks: File exists and is readable. Valid YAML syntax. Non-empty content. Required fields present.
+    **Key checks:**  
+    • File exists and is readable  
+    • Valid YAML syntax  
+    • Non-empty content  
+    • Required fields present
     """)
     st.code("""
 import yaml
@@ -710,7 +728,11 @@ with st.expander("2 - Business Rule Checks", expanded=False):
     st.markdown("""
     Beyond syntax validation, the configuration must satisfy business logic rules. Violating these could lead to trading failures or compliance issues.
     
-    Critical rules: Exactly one central prime broker (required for venue access). No duplicate IDs (prevents ambiguous references). All references point to valid entities. Referential integrity across files.
+    **Critical rules:**  
+    • Exactly one central prime broker (required for venue access)  
+    • No duplicate IDs (prevents ambiguous references)  
+    • All references point to valid entities  
+    • Referential integrity across files
     """)
     st.code("""
 def validate_configuration(prime_brokers, customers, sessions, credit_data):
@@ -815,7 +837,11 @@ with st.expander("4 - Common Edge Cases", expanded=False):
     st.markdown("""
     Real-world trading systems encounter various edge cases that aren't necessarily errors but require monitoring. These can impact operations and should be flagged.
     
-    Common scenarios: Customers with multiple sessions (legitimate but worth tracking). Customers with sessions but no credit limits (configuration gap). Stale credit data (outdated information). Invalid timestamps (data quality issues).
+    **Common scenarios:**  
+    • Customers with multiple sessions (legitimate but worth tracking)  
+    • Customers with sessions but no credit limits (configuration gap)  
+    • Stale credit data (outdated information)  
+    • Invalid timestamps (data quality issues)
     """)
     st.code("""
 def check_edge_cases(customers, sessions, credit_data):
@@ -876,11 +902,11 @@ with st.expander("Conditional Credit Rules Engine", expanded=False):
     st.markdown("""
     Instead of static credit limits, vendors can submit conditional rules that automatically adjust credit based on real-time market conditions, customer behavior, and risk metrics.
     
-    Expressive rule language: Vendors define complex conditions using JSON-based expressions. Rules can reference market data, customer trading patterns, time of day, volatility metrics. Multiple conditions can be combined with logical operators (AND, OR, NOT).
+    **Expressive rule language:** Vendors define complex conditions using JSON-based expressions. Rules can reference market data, customer trading patterns, time of day, volatility metrics. Multiple conditions can be combined with logical operators (AND, OR, NOT).
     
-    Real-time evaluation: Rules are evaluated continuously against live market feeds. Credit adjustments happen automatically when conditions are met. All changes are logged with full audit trails showing which rule triggered the change.
+    **Real-time evaluation:** Rules are evaluated continuously against live market feeds. Credit adjustments happen automatically when conditions are met. All changes are logged with full audit trails showing which rule triggered the change.
     
-    Vendor competition: Multiple vendors can submit competing rules for the same customer. System selects the most conservative (lowest risk) limit when rules conflict. Vendors are scored based on prediction accuracy and risk management performance.
+    **Vendor competition:** Multiple vendors can submit competing rules for the same customer. System selects the most conservative (lowest risk) limit when rules conflict. Vendors are scored based on prediction accuracy and risk management performance.
     """)
     
     st.code("""
@@ -1013,11 +1039,11 @@ with st.expander("Per-Instrument Credit Limits", expanded=False):
     st.markdown("""
     Current schema has aggregate credit limits per customer-PB relationship. For per-instrument limits:
     
-    Instrument hierarchy: Define instrument categories (FX majors, minors, exotics). Set limits at category and individual instrument levels. Inherit limits from parent categories with overrides.
+    **Instrument hierarchy:** Define instrument categories (FX majors, minors, exotics). Set limits at category and individual instrument levels. Inherit limits from parent categories with overrides.
     
-    Multi-dimensional limits: Credit limits by instrument, tenor, notional size. Time-based limits (daily, weekly, monthly). Concentration limits to prevent over-exposure to single instruments.
+    **Multi-dimensional limits:** Credit limits by instrument, tenor, notional size. Time-based limits (daily, weekly, monthly). Concentration limits to prevent over-exposure to single instruments.
     
-    Real-time monitoring: Track utilization per instrument in real-time. Alert when approaching instrument-specific limits. Automatic rejection of trades exceeding limits.
+    **Real-time monitoring:** Track utilization per instrument in real-time. Alert when approaching instrument-specific limits. Automatic rejection of trades exceeding limits.
     """)
     
     st.code("""
@@ -1059,7 +1085,7 @@ instrument_credit_limits:
     """, language='yaml')
 
 st.markdown("""
-Key extensibility principles:
+#### Key extensibility principles:
 
 **Vendor ecosystem:** Enable multiple credit vendors to compete by submitting sophisticated rules. Create marketplace dynamics where vendors are rewarded for accurate risk assessment. Allow customers to choose preferred vendor strategies or let system auto-select best performers.
 
@@ -1072,14 +1098,10 @@ Key extensibility principles:
 **Performance tracking:** Score vendors based on prediction accuracy and risk-adjusted returns. Track rule performance over different market conditions. Enable data-driven vendor selection and rule optimization.
 """)
 
-# --- Trade Reject Resolution ---
-st.header("Trade Reject Resolution")
-st.markdown("""
-Handling real-time trade rejects for "Customer to PB Credit Limit Exceeded" - verification steps and remediation process.
-""")
+
 
 # Trade Flow Diagram - moved here from the end
-st.subheader("Trade Rejection Flow")
+st.header("Trade Rejection Flow")
 st.markdown("""
 Visual representation of how a trade gets rejected when a customer exceeds their credit limit with their Prime Broker.
 """)
@@ -1104,51 +1126,83 @@ trade_flow_diagram = """
             max-width: 1200px; 
             margin: 0 auto;
         }
+        .flow-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            justify-content: space-between;
+        }
+        .flow-row.reverse {
+            flex-direction: row-reverse;
+        }
         .flow-step {
             display: flex;
             align-items: center;
-            gap: 20px;
-            padding: 15px;
+            gap: 15px;
+            padding: 12px;
             border-radius: 10px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex: 1;
+            max-width: 280px;
         }
         .step-number {
             background: #007bff;
             color: white;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 35px;
+            height: 35px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
             flex-shrink: 0;
+            font-size: 14px;
         }
         .step-content {
             flex: 1;
         }
         .step-title {
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
             color: #2c3e50;
+            font-size: 14px;
         }
         .step-description {
-            font-size: 14px;
+            font-size: 11px;
             color: #666;
+            margin-bottom: 5px;
         }
         .step-data {
             background: #f8f9fa;
-            padding: 8px;
-            border-radius: 5px;
-            margin-top: 8px;
+            padding: 6px;
+            border-radius: 4px;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 10px;
+            line-height: 1.2;
         }
-        .arrow {
-            text-align: center;
-            font-size: 24px;
+        .arrow-horizontal {
+            font-size: 20px;
+            color: #007bff;
+            flex-shrink: 0;
+        }
+        .arrow-down {
+            font-size: 20px;
             color: #007bff;
             margin: 10px 0;
+        }
+        .arrow-down-right {
+            text-align: right;
+            font-size: 20px;
+            color: #007bff;
+            margin: 10px 0;
+            padding-right: 80px;
+        }
+        .arrow-down-left {
+            text-align: left;
+            font-size: 20px;
+            color: #007bff;
+            margin: 10px 0;
+            padding-left: 80px;
         }
         .success { background: linear-gradient(135deg, #d4edda, #c3e6cb); }
         .processing { background: linear-gradient(135deg, #fff3cd, #ffeaa7); }
@@ -1186,160 +1240,144 @@ trade_flow_diagram = """
 <body>
     <div class="flow-container">
         <!-- Participants -->
-        <div class="participants">
-            <div class="participant">
-                <div class="participant-title">Customer</div>
-                <div class="participant-role">Hedge Fund Gamma</div>
-                <div class="participant-role">Sends trade via FIX</div>
-            </div>
-            <div class="participant">
-                <div class="participant-title">OneChronos</div>
-                <div class="participant-role">Trading Platform</div>
-                <div class="participant-role">Validates & routes</div>
-            </div>
-            <div class="participant">
-                <div class="participant-title">Prime Broker</div>
-                <div class="participant-role">PB_A (Alpha)</div>
-                <div class="participant-role">Provides credit</div>
-            </div>
-            <div class="participant">
-                <div class="participant-title">Central PB</div>
-                <div class="participant-role">CPB_1</div>
-                <div class="participant-role">Venue access</div>
-            </div>
-        </div>
+       
 
-        <!-- Flow Steps -->
-        <div class="flow-step success">
-            <div class="step-number">1</div>
-            <div class="step-content">
-                <div class="step-title">Customer Submits Trade</div>
-                <div class="step-description">Customer sends trade order via FIX session to OneChronos platform</div>
-                <div class="step-data">
-                    FIX Message: NewOrderSingle<br>
-                    Session: FIXS_C1_PBA_001<br>
-                    Customer: Cust_1 (Hedge Fund Gamma)<br>
-                    Instrument: EURUSD<br>
-                    Notional: $600,000<br>
-                    Side: BUY
+        <!-- Row 1: Left to Right (Steps 1-3) -->
+        <div class="flow-row">
+            <div class="flow-step success">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Customer Submits Trade</div>
+                    <div class="step-description">Customer sends trade order via FIX session</div>
+                    <div class="step-data">
+                        Session: FIXS_C1_PBA_001<br>
+                        Customer: Cust_1<br>
+                        Instrument: EURUSD<br>
+                        Notional: $600,000
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow-horizontal">→</div>
+            
+            <div class="flow-step processing">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">OneChronos Receives Trade</div>
+                    <div class="step-description">Platform receives FIX message and begins validation</div>
+                    <div class="step-data">
+                        Trade ID: TRD_789456<br>
+                        Lookup: Cust_1 → PB_A<br>
+                        Timestamp: 14:30:15Z
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow-horizontal">→</div>
+            
+            <div class="flow-step system">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Credit Limit Lookup</div>
+                    <div class="step-description">Check customer's credit limit with PB</div>
+                    <div class="step-data">
+                        Query: Cust_1 → PB_A<br>
+                        Limit: $1,000,000 USD<br>
+                        Updated: 08:00:00Z
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="arrow">↓</div>
+        <!-- Down Arrow - positioned at right to follow flow -->
+        <div class="arrow-down-right">↓</div>
 
-        <div class="flow-step processing">
-            <div class="step-number">2</div>
-            <div class="step-content">
-                <div class="step-title">OneChronos Receives Trade</div>
-                <div class="step-description">Platform receives FIX message and begins validation process</div>
-                <div class="step-data">
-                    Timestamp: 2024-01-15T14:30:15Z<br>
-                    Trade ID: TRD_789456<br>
-                    Session Lookup: FIXS_C1_PBA_001 → Customer: Cust_1, PB: PB_A
+        <!-- Row 2: Right to Left (Steps 4-6) -->
+        <div class="flow-row reverse">
+            <div class="flow-step system">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <div class="step-title">Current Exposure Calculation</div>
+                    <div class="step-description">Calculate current exposure across all positions</div>
+                    <div class="step-data">
+                        GBPUSD: $250,000<br>
+                        USDJPY: $200,000<br>
+                        Total: $450,000<br>
+                        Available: $550,000
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow-horizontal">←</div>
+            
+            <div class="flow-step error">
+                <div class="step-number">5</div>
+                <div class="step-content">
+                    <div class="step-title">Credit Limit Breach Detected</div>
+                    <div class="step-description">New trade would exceed credit limit</div>
+                    <div class="step-data">
+                        New: $600,000<br>
+                        Current: $450,000<br>
+                        Total: $1,050,000<br>
+                        <strong style="color: #dc3545;">BREACH: $50,000</strong>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow-horizontal">←</div>
+            
+            <div class="flow-step error">
+                <div class="step-number">6</div>
+                <div class="step-content">
+                    <div class="step-title">Trade Rejection</div>
+                    <div class="step-description">OneChronos rejects trade and sends rejection</div>
+                    <div class="step-data">
+                        FIX: ExecutionReport<br>
+                        ExecType: Rejected (8)<br>
+                        Reason: Credit exceeded<br>
+                        Available: $550,000
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="arrow">↓</div>
+        <!-- Down Arrow - positioned at left to follow flow -->
+        <div class="arrow-down-left">↓</div>
 
-        <div class="flow-step system">
-            <div class="step-number">3</div>
-            <div class="step-content">
-                <div class="step-title">Credit Limit Lookup</div>
-                <div class="step-description">OneChronos checks customer's credit limit with their Prime Broker</div>
-                <div class="step-data">
-                    Query: Customer Cust_1 → PB_A credit limit<br>
-                    Result: Limit = $1,000,000 USD<br>
-                    Currency: USD<br>
-                    Last Updated: 2024-01-15T08:00:00Z
+        <!-- Row 3: Left to Right (Steps 7-8) -->
+        <div class="flow-row">
+            <div class="flow-step communication">
+                <div class="step-number">7</div>
+                <div class="step-content">
+                    <div class="step-title">Alert & Notification</div>
+                    <div class="step-description">Trigger alerts and begin communication</div>
+                    <div class="step-data">
+                        • Internal alert to ops team<br>
+                        • Customer notification<br>
+                        • PB notification<br>
+                        • Audit log entry
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <div class="arrow">↓</div>
-
-        <div class="flow-step system">
-            <div class="step-number">4</div>
-            <div class="step-content">
-                <div class="step-title">Current Exposure Calculation</div>
-                <div class="step-description">Calculate customer's current exposure with PB_A across all open positions</div>
-                <div class="step-data">
-                    Current Open Positions:<br>
-                    • GBPUSD: $250,000<br>
-                    • USDJPY: $200,000<br>
-                    Total Current Exposure: $450,000<br>
-                    Available Credit: $550,000
+            
+            <div class="arrow-horizontal">→</div>
+            
+            <div class="flow-step processing">
+                <div class="step-number">8</div>
+                <div class="step-content">
+                    <div class="step-title">Resolution Process Begins</div>
+                    <div class="step-description">Coordinate with customer and PB to resolve</div>
+                    <div class="step-data">
+                        Options:<br>
+                        • Temporary credit increase<br>
+                        • Reduce positions<br>
+                        • Split trade
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <div class="arrow">↓</div>
-
-        <div class="flow-step error">
-            <div class="step-number">5</div>
-            <div class="step-content">
-                <div class="step-title">Credit Limit Breach Detected</div>
-                <div class="step-description">New trade would exceed customer's credit limit with Prime Broker</div>
-                <div class="step-data">
-                    New Trade: $600,000<br>
-                    Current Exposure: $450,000<br>
-                    Total Would Be: $1,050,000<br>
-                    Credit Limit: $1,000,000<br>
-                    <strong style="color: #dc3545;">BREACH: $50,000 over limit</strong>
-                </div>
-            </div>
-        </div>
-
-        <div class="arrow">↓</div>
-
-        <div class="flow-step error">
-            <div class="step-number">6</div>
-            <div class="step-content">
-                <div class="step-title">Trade Rejection</div>
-                <div class="step-description">OneChronos rejects the trade and sends rejection message back to customer</div>
-                <div class="step-data">
-                    FIX Message: ExecutionReport<br>
-                    ExecType: Rejected (8)<br>
-                    OrdRejReason: Credit limit exceeded (99)<br>
-                    Text: "Customer to PB Credit Limit Exceeded"<br>
-                    Available Credit: $550,000
-                </div>
-            </div>
-        </div>
-
-        <div class="arrow">↓</div>
-
-        <div class="flow-step communication">
-            <div class="step-number">7</div>
-            <div class="step-content">
-                <div class="step-title">Alert & Notification</div>
-                <div class="step-description">OneChronos triggers alerts and begins customer communication process</div>
-                <div class="step-data">
-                    • Internal alert to OneChronos operations team<br>
-                    • Customer notification via email/phone<br>
-                    • PB notification of credit breach<br>
-                    • Audit log entry created<br>
-                    • Resolution workflow initiated
-                </div>
-            </div>
-        </div>
-
-        <div class="arrow">↓</div>
-
-        <div class="flow-step processing">
-            <div class="step-number">8</div>
-            <div class="step-content">
-                <div class="step-title">Resolution Process Begins</div>
-                <div class="step-description">OneChronos coordinates with customer and PB to resolve credit issue</div>
-                <div class="step-data">
-                    Options:<br>
-                    • Request temporary credit increase from PB<br>
-                    • Customer reduces existing positions<br>
-                    • Split trade into smaller sizes<br>
-                    • Wait for existing trades to settle
-                </div>
-            </div>
+            
+            <!-- Empty space to balance the row -->
+            <div style="flex: 1; max-width: 280px;"></div>
         </div>
     </div>
 </body>
@@ -1347,8 +1385,9 @@ trade_flow_diagram = """
 """
 
 # Display the trade flow diagram
-st.components.v1.html(trade_flow_diagram, height=1400)
+st.components.v1.html(trade_flow_diagram, height=600)
 
+st.markdown("---")
 
 st.markdown("## Resolution Steps")
 
@@ -1588,3 +1627,252 @@ st.markdown("""
 
 **Key success factors:** Fast response time to minimize trading disruption. Clear communication with all parties. Proper documentation for audit compliance. Proactive monitoring to prevent future breaches.
 """)
+
+# --- Trading Simulation ---
+st.header("Trading Simulation")
+st.markdown("""
+Submit orders to see credit limit validation. Orders will be rejected if they breach customer or PB credit limits.
+""")
+
+# Initialize session state for order book and positions
+if 'order_book' not in st.session_state:
+    st.session_state.order_book = []
+
+if 'positions' not in st.session_state:
+    st.session_state.positions = {}
+
+if 'trade_id_counter' not in st.session_state:
+    st.session_state.trade_id_counter = 1
+
+# Trading interface in expandable panels
+with st.expander("New Order Ticket", expanded=True):
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("""
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
+        <h4 style="margin-top: 0; color: #2c3e50;">Order Entry</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Order inputs
+        selected_customer = st.selectbox("Customer:", [customer['id'] for customer in customers], key="trade_customer")
+        instrument = st.selectbox("Instrument:", ["EURUSD", "GBPUSD", "USDJPY", "EURGBP", "AUDUSD"], key="trade_instrument")
+        side = st.selectbox("Side:", ["BUY", "SELL"], key="trade_side")
+        notional = st.number_input("Notional ($):", min_value=1000, max_value=10000000, value=100000, step=10000, key="trade_notional")
+        
+        if st.button("Submit Order", type="primary", use_container_width=True):
+            # Find customer's PB from sessions
+            customer_pb = None
+            for session in sessions:
+                if session['customer_id'] == selected_customer:
+                    customer_pb = session['pb_id']
+                    break
+            
+            if customer_pb:
+                # Calculate current exposure for customer
+                current_exposure = 0
+                position_key = f"{selected_customer}|{customer_pb}"
+                if position_key in st.session_state.positions:
+                    current_exposure = st.session_state.positions[position_key]
+                
+                # Get credit limit
+                customer_limit = 0
+                for limit in credit_data_for_queries['customer_pb_limits']:
+                    if limit['customer_id'] == selected_customer and limit['pb_id'] == customer_pb:
+                        customer_limit = limit['limit_amount']
+                        break
+                
+                # Check customer credit limit
+                new_exposure = current_exposure + notional
+                customer_breach = new_exposure > customer_limit
+                
+                # Check PB credit line (only for non-central PBs)
+                pb_breach = False
+                pb_total_exposure = 0
+                pb_credit_line = 0
+                
+                if customer_pb != "CPB_1":  # Only check PB limits for non-central PBs
+                    # Calculate PB total exposure to all customers
+                    for pos_key, exposure in st.session_state.positions.items():
+                        if pos_key.endswith(f"|{customer_pb}"):
+                            pb_total_exposure += exposure
+                    
+                    # Add this new trade to PB exposure
+                    pb_new_total = pb_total_exposure + notional
+                    
+                    # Get PB credit line with central PB
+                    for limit in credit_data_for_queries['pb_to_central_pb_limits']:
+                        if limit['non_central_pb_id'] == customer_pb:
+                            pb_credit_line = limit['limit_amount']
+                            break
+                    
+                    # Check PB credit line
+                    pb_breach = pb_new_total > pb_credit_line
+                
+                # Create order
+                order = {
+                    'trade_id': f"TRD_{st.session_state.trade_id_counter:06d}",
+                    'timestamp': "2024-01-15T" + str(14 + len(st.session_state.order_book) % 10) + f":{30 + len(st.session_state.order_book) % 30:02d}:00Z",
+                    'customer_id': selected_customer,
+                    'pb_id': customer_pb,
+                    'instrument': instrument,
+                    'side': side,
+                    'notional': notional,
+                    'status': 'PENDING'
+                }
+                
+                # Validate and execute or reject
+                if customer_breach:
+                    order['status'] = 'REJECTED'
+                    order['reject_reason'] = f"Customer credit limit exceeded. Limit: ${customer_limit:,}, Would be: ${new_exposure:,}"
+                    st.error(f"Order REJECTED: Customer {selected_customer} would exceed credit limit with {customer_pb}")
+                    st.error(f"Current exposure: ${current_exposure:,}, New trade: ${notional:,}, Limit: ${customer_limit:,}")
+                elif pb_breach:
+                    order['status'] = 'REJECTED'
+                    order['reject_reason'] = f"PB credit line exceeded. PB limit: ${pb_credit_line:,}, Would be: ${pb_new_total:,}"
+                    st.error(f"Order REJECTED: PB {customer_pb} would exceed credit line with Central PB")
+                    st.error(f"PB current exposure: ${pb_total_exposure:,}, New trade: ${notional:,}, PB limit: ${pb_credit_line:,}")
+                else:
+                    order['status'] = 'EXECUTED'
+                    # Update positions
+                    st.session_state.positions[position_key] = new_exposure
+                    st.success(f"Order EXECUTED: {side} ${notional:,} {instrument}")
+                    if customer_pb == "CPB_1":
+                        st.info(f"Direct Central PB trade - New exposure for {selected_customer}: ${new_exposure:,} / ${customer_limit:,}")
+                    else:
+                        st.info(f"New exposure for {selected_customer} with {customer_pb}: ${new_exposure:,} / ${customer_limit:,}")
+                
+                # Add to order book
+                st.session_state.order_book.append(order)
+                st.session_state.trade_id_counter += 1
+            else:
+                st.error("No PB found for this customer")
+
+    with col2:
+        st.subheader("Current Positions")
+        
+        if st.session_state.positions:
+            # Show customer positions
+            st.write("**Customer Positions:**")
+            for position_key, exposure in st.session_state.positions.items():
+                customer_id, pb_id = position_key.split('|')
+                
+                # Get customer limit
+                customer_limit = 0
+                for l in credit_data_for_queries['customer_pb_limits']:
+                    if l['customer_id'] == customer_id and l['pb_id'] == pb_id:
+                        customer_limit = l['limit_amount']
+                        break
+                
+                utilization = (exposure / customer_limit * 100) if customer_limit > 0 else 0
+                
+                st.write(f"**{customer_id} → {pb_id}**")
+                st.write(f"Exposure: ${exposure:,} / ${customer_limit:,} ({utilization:.1f}%)")
+                st.progress(min(utilization / 100, 1.0))
+                st.write("---")
+            
+            # Show PB credit line utilization
+            st.write("**PB Credit Lines:**")
+            pb_exposures = {}
+            
+            # Calculate total exposure per PB (excluding CPB_1 since it's the central PB)
+            for position_key, exposure in st.session_state.positions.items():
+                customer_id, pb_id = position_key.split('|')
+                if pb_id != "CPB_1":  # Only track non-central PBs
+                    if pb_id not in pb_exposures:
+                        pb_exposures[pb_id] = 0
+                    pb_exposures[pb_id] += exposure
+            
+            # Display PB credit line utilization
+            if pb_exposures:
+                for pb_id, total_exposure in pb_exposures.items():
+                    # Get PB credit line with central PB
+                    pb_credit_line = 0
+                    for limit in credit_data_for_queries['pb_to_central_pb_limits']:
+                        if limit['non_central_pb_id'] == pb_id:
+                            pb_credit_line = limit['limit_amount']
+                            break
+                    
+                    pb_utilization = (total_exposure / pb_credit_line * 100) if pb_credit_line > 0 else 0
+                    
+                    st.write(f"**{pb_id} → Central PB**")
+                    st.write(f"Total Exposure: ${total_exposure:,} / ${pb_credit_line:,} ({pb_utilization:.1f}%)")
+                    st.progress(min(pb_utilization / 100, 1.0))
+                    st.write("---")
+            else:
+                st.write("No non-central PB exposures yet")
+                
+            # Show CPB_1 direct exposures separately
+            cpb_direct_exposure = 0
+            for position_key, exposure in st.session_state.positions.items():
+                customer_id, pb_id = position_key.split('|')
+                if pb_id == "CPB_1":
+                    cpb_direct_exposure += exposure
+            
+            if cpb_direct_exposure > 0:
+                st.write("**Central PB Direct Exposures:**")
+                st.write("**CPB_1 Direct Trading**")
+                st.write(f"Total Direct Exposure: ${cpb_direct_exposure:,}")
+                st.write("(No credit line limit - Central PB capacity)")
+                st.write("---")
+        
+        else:
+            st.write("No positions yet")
+        
+        # Reset button
+        if st.button("Reset All Positions", use_container_width=True):
+            st.session_state.positions = {}
+            st.session_state.order_book = []
+            st.session_state.trade_id_counter = 1
+            st.success("All positions and orders cleared!")
+            st.rerun()
+
+# Order Book as a proper table
+with st.expander("Order Book", expanded=False):
+    if st.session_state.order_book:
+        # Create DataFrame for better table display
+        import pandas as pd
+        
+        # Show recent orders (last 15)
+        recent_orders = st.session_state.order_book[-15:]
+        
+        # Prepare data for table
+        table_data = []
+        for order in reversed(recent_orders):
+            status_text = "EXECUTED" if order['status'] == 'EXECUTED' else "REJECTED"
+            table_data.append({
+                'Status': status_text,
+                'Trade ID': order['trade_id'],
+                'Time': order['timestamp'].split('T')[1][:8],  # Just time part
+                'Customer': order['customer_id'],
+                'PB': order['pb_id'],
+                'Side': order['side'],
+                'Instrument': order['instrument'],
+                'Notional': f"${order['notional']:,}",
+                'Reject Reason': order.get('reject_reason', '')[:50] + '...' if order.get('reject_reason', '') and len(order.get('reject_reason', '')) > 50 else order.get('reject_reason', '')
+            })
+        
+        df = pd.DataFrame(table_data)
+        
+        # Display table
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Status": st.column_config.TextColumn("Status", width="small"),
+                "Trade ID": st.column_config.TextColumn("Trade ID", width="medium"),
+                "Time": st.column_config.TextColumn("Time", width="small"),
+                "Customer": st.column_config.TextColumn("Customer", width="small"),
+                "PB": st.column_config.TextColumn("PB", width="small"),
+                "Side": st.column_config.TextColumn("Side", width="small"),
+                "Instrument": st.column_config.TextColumn("Instrument", width="small"),
+                "Notional": st.column_config.TextColumn("Notional", width="medium"),
+                "Reject Reason": st.column_config.TextColumn("Reject Reason", width="large")
+            }
+        )
+    else:
+        st.write("No orders submitted yet")
+
+
