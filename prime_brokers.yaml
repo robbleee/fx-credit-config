@@ -1,0 +1,9 @@
+- id: "CPB_1"
+  name: "Central Prime Broker One"
+  is_central_pb: true
+- id: "PB_A"
+  name: "Prime Broker Alpha"
+  is_central_pb: false
+- id: "PB_B"
+  name: "Prime Broker Beta"
+  is_central_pb: false 
