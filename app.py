@@ -5,6 +5,17 @@ import os
 # --- Streamlit App Layout (must be first) ---
 st.set_page_config(layout="wide", page_title="FX Credit Configuration Viewer")
 
+# Custom CSS to make the layout a bit narrower than full wide
+st.markdown("""
+<style>
+    .main .block-container {
+        max-width: 1200px;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- Load Configuration Data from YAML files ---
 
 @st.cache_data
@@ -39,12 +50,7 @@ sessions_data_str = data_to_yaml_string(sessions_data)
 credit_data_str = data_to_yaml_string(credit_data)
 
 st.title("FX Credit Configuration Schema Viewer")
-st.markdown("""
-This application demonstrates a configuration schema for FX trading systems that addresses the core challenges 
-in institutional prime brokerage relationships. The schema focuses on client onboarding efficiency, 
-operational risk management, and real-time trading support - key requirements for successful business development 
-in institutional FX markets.
-""")
+
 
 # Show file loading status
 if all([prime_brokers_data, customers_data, sessions_data, credit_data]):
@@ -857,24 +863,7 @@ for issue in issues:
     print(f"NOTICE: {issue}")
     """, language='python')
 
-st.markdown("---")
-st.markdown("""
-Error Handling Checklist:
 
-**File loading:** handle missing files and YAML parsing errors. 
-
-**Required fields:** ensure all mandatory fields are present. 
-
-**Unique IDs:** check for duplicate identifiers. 
-
-**Referential integrity:** verify all ID references are valid. 
-
-**Central PB rule:** exactly one central prime broker must exist. 
-
-**Credit exposure:** PBs cannot exceed their central PB credit lines. 
-
-**Edge cases:** handle multiple sessions, missing credit limits, stale data.
-""")
 
 # --- Future Extensibility ---
 st.header("Future Extensibility")
@@ -1088,6 +1077,280 @@ st.header("Trade Reject Resolution")
 st.markdown("""
 Handling real-time trade rejects for "Customer to PB Credit Limit Exceeded" - verification steps and remediation process.
 """)
+
+# Trade Flow Diagram - moved here from the end
+st.subheader("Trade Rejection Flow")
+st.markdown("""
+Visual representation of how a trade gets rejected when a customer exceeds their credit limit with their Prime Broker.
+""")
+
+# Create trade flow diagram
+trade_flow_diagram = """
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 20px; 
+            background-color: white; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+        }
+        .flow-container { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px; 
+            max-width: 1200px; 
+            margin: 0 auto;
+        }
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .step-number {
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .step-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #2c3e50;
+        }
+        .step-description {
+            font-size: 14px;
+            color: #666;
+        }
+        .step-data {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 5px;
+            margin-top: 8px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .arrow {
+            text-align: center;
+            font-size: 24px;
+            color: #007bff;
+            margin: 10px 0;
+        }
+        .success { background: linear-gradient(135deg, #d4edda, #c3e6cb); }
+        .processing { background: linear-gradient(135deg, #fff3cd, #ffeaa7); }
+        .error { background: linear-gradient(135deg, #f8d7da, #f5c6cb); }
+        .system { background: linear-gradient(135deg, #d1ecf1, #bee5eb); }
+        .communication { background: linear-gradient(135deg, #e2e3e5, #d6d8db); }
+        
+        .participants {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .participant {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-width: 120px;
+        }
+        .participant-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .participant-role {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="flow-container">
+        <!-- Participants -->
+        <div class="participants">
+            <div class="participant">
+                <div class="participant-title">Customer</div>
+                <div class="participant-role">Hedge Fund Gamma</div>
+                <div class="participant-role">Sends trade via FIX</div>
+            </div>
+            <div class="participant">
+                <div class="participant-title">OneChronos</div>
+                <div class="participant-role">Trading Platform</div>
+                <div class="participant-role">Validates & routes</div>
+            </div>
+            <div class="participant">
+                <div class="participant-title">Prime Broker</div>
+                <div class="participant-role">PB_A (Alpha)</div>
+                <div class="participant-role">Provides credit</div>
+            </div>
+            <div class="participant">
+                <div class="participant-title">Central PB</div>
+                <div class="participant-role">CPB_1</div>
+                <div class="participant-role">Venue access</div>
+            </div>
+        </div>
+
+        <!-- Flow Steps -->
+        <div class="flow-step success">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <div class="step-title">Customer Submits Trade</div>
+                <div class="step-description">Customer sends trade order via FIX session to OneChronos platform</div>
+                <div class="step-data">
+                    FIX Message: NewOrderSingle<br>
+                    Session: FIXS_C1_PBA_001<br>
+                    Customer: Cust_1 (Hedge Fund Gamma)<br>
+                    Instrument: EURUSD<br>
+                    Notional: $600,000<br>
+                    Side: BUY
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="flow-step processing">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <div class="step-title">OneChronos Receives Trade</div>
+                <div class="step-description">Platform receives FIX message and begins validation process</div>
+                <div class="step-data">
+                    Timestamp: 2024-01-15T14:30:15Z<br>
+                    Trade ID: TRD_789456<br>
+                    Session Lookup: FIXS_C1_PBA_001 → Customer: Cust_1, PB: PB_A
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="flow-step system">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <div class="step-title">Credit Limit Lookup</div>
+                <div class="step-description">OneChronos checks customer's credit limit with their Prime Broker</div>
+                <div class="step-data">
+                    Query: Customer Cust_1 → PB_A credit limit<br>
+                    Result: Limit = $1,000,000 USD<br>
+                    Currency: USD<br>
+                    Last Updated: 2024-01-15T08:00:00Z
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="flow-step system">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <div class="step-title">Current Exposure Calculation</div>
+                <div class="step-description">Calculate customer's current exposure with PB_A across all open positions</div>
+                <div class="step-data">
+                    Current Open Positions:<br>
+                    • GBPUSD: $250,000<br>
+                    • USDJPY: $200,000<br>
+                    Total Current Exposure: $450,000<br>
+                    Available Credit: $550,000
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="flow-step error">
+            <div class="step-number">5</div>
+            <div class="step-content">
+                <div class="step-title">Credit Limit Breach Detected</div>
+                <div class="step-description">New trade would exceed customer's credit limit with Prime Broker</div>
+                <div class="step-data">
+                    New Trade: $600,000<br>
+                    Current Exposure: $450,000<br>
+                    Total Would Be: $1,050,000<br>
+                    Credit Limit: $1,000,000<br>
+                    <strong style="color: #dc3545;">BREACH: $50,000 over limit</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="flow-step error">
+            <div class="step-number">6</div>
+            <div class="step-content">
+                <div class="step-title">Trade Rejection</div>
+                <div class="step-description">OneChronos rejects the trade and sends rejection message back to customer</div>
+                <div class="step-data">
+                    FIX Message: ExecutionReport<br>
+                    ExecType: Rejected (8)<br>
+                    OrdRejReason: Credit limit exceeded (99)<br>
+                    Text: "Customer to PB Credit Limit Exceeded"<br>
+                    Available Credit: $550,000
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="flow-step communication">
+            <div class="step-number">7</div>
+            <div class="step-content">
+                <div class="step-title">Alert & Notification</div>
+                <div class="step-description">OneChronos triggers alerts and begins customer communication process</div>
+                <div class="step-data">
+                    • Internal alert to OneChronos operations team<br>
+                    • Customer notification via email/phone<br>
+                    • PB notification of credit breach<br>
+                    • Audit log entry created<br>
+                    • Resolution workflow initiated
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="flow-step processing">
+            <div class="step-number">8</div>
+            <div class="step-content">
+                <div class="step-title">Resolution Process Begins</div>
+                <div class="step-description">OneChronos coordinates with customer and PB to resolve credit issue</div>
+                <div class="step-data">
+                    Options:<br>
+                    • Request temporary credit increase from PB<br>
+                    • Customer reduces existing positions<br>
+                    • Split trade into smaller sizes<br>
+                    • Wait for existing trades to settle
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+# Display the trade flow diagram
+st.components.v1.html(trade_flow_diagram, height=1400)
+
+
+st.markdown("## Resolution Steps")
 
 with st.expander("1 - Verify Limit Breach", expanded=False):
     st.markdown("Steps to confirm the credit limit that was breached")
