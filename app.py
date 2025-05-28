@@ -119,6 +119,9 @@ if st.session_state.nav_section == 'yaml_choice':
         gives us the best - it's human-readable like JSON but supports comments for documenting business rules. Operations teams can make emergency credit adjustments without developer support. The indentation-based structure makes relationships clear at a glance. Git diffs are clean and reviewable. Most DevOps tools have excellent YAML support.
         """)
 
+
+        
+
 elif st.session_state.nav_section == 'overview':
     # --- Schema Diagram ---
     st.header("Configuration Schema Overview")
@@ -710,111 +713,6 @@ elif st.session_state.nav_section == 'interactive':
     print(f"Utilization: {result['utilization']:.1f}%")
         """, language='python')
 
-    with st.expander("4 - Per-Instrument Credit Limits", expanded=False):
-        st.markdown("Granular credit control at the instrument level")
-        st.markdown("""
-        Currently the schema has aggregate credit limits per customer-PB relationship. For per-instrument limits, we could implement:
-        
-        **Instrument hierarchy:** We could define instrument categories (FX majors, minors, exotics). Set limits at category and individual instrument levels. Inherit limits from parent categories with overrides.
-        
-        **Multi-dimensional limits:** We could add credit limits by instrument, tenor, notional size. Time-based limits (daily, weekly, monthly). Concentration limits to prevent over-exposure to single instruments.
-        
-        **Real-time monitoring:** We'd track utilization per instrument in real-time. Alert when approaching instrument-specific limits. Automatically reject trades exceeding limits.
-        """)
-        
-        st.code("""
-# Extended credit data structure with per-instrument limits
-instrument_credit_config = {
-    "customer_id": "Cust_1",
-    "pb_id": "PB_A",
-    "aggregate_limit": 1000000,  # Overall limit
-    "instrument_limits": {
-        "categories": {
-            "FX_MAJORS": {
-                "limit": 800000,
-                "instruments": ["EURUSD", "GBPUSD", "USDJPY", "USDCHF"]
-            },
-            "FX_MINORS": {
-                "limit": 150000,
-                "instruments": ["EURGBP", "EURJPY", "GBPJPY"]
-            },
-            "FX_EXOTICS": {
-                "limit": 50000,
-                "instruments": ["USDTRY", "USDZAR", "USDMXN"]
-            }
-        },
-        "individual_overrides": {
-            "EURUSD": {"limit": 500000},  # Override within FX_MAJORS
-            "USDTRY": {"limit": 25000}    # Override within FX_EXOTICS
-        }
-    },
-    "concentration_limits": {
-        "max_single_instrument_pct": 60,  # Max 60% in any single instrument
-        "max_category_pct": 80             # Max 80% in any category
-    }
-}
-
-def validate_instrument_trade(customer_id, pb_id, instrument, notional, current_positions):
-    \"\"\"Validate trade against per-instrument credit limits\"\"\"
-    config = get_instrument_credit_config(customer_id, pb_id)
-    
-    # Get instrument category and limits
-    category = get_instrument_category(instrument, config)
-    instrument_limit = get_effective_instrument_limit(instrument, config)
-    
-    # Calculate current exposures
-    current_instrument_exposure = current_positions.get(instrument, 0)
-    current_category_exposure = sum(current_positions.get(instr, 0) 
-                                  for instr in config["instrument_limits"]["categories"][category]["instruments"])
-    total_exposure = sum(current_positions.values())
-    
-    # Check limits
-    checks = {
-        "aggregate_limit": {
-            "current": total_exposure + notional,
-            "limit": config["aggregate_limit"],
-            "passed": (total_exposure + notional) <= config["aggregate_limit"]
-        },
-        "instrument_limit": {
-            "current": current_instrument_exposure + notional,
-            "limit": instrument_limit,
-            "passed": (current_instrument_exposure + notional) <= instrument_limit
-        },
-        "category_limit": {
-            "current": current_category_exposure + notional,
-            "limit": config["instrument_limits"]["categories"][category]["limit"],
-            "passed": (current_category_exposure + notional) <= config["instrument_limits"]["categories"][category]["limit"]
-        },
-        "concentration_check": {
-            "instrument_pct": ((current_instrument_exposure + notional) / config["aggregate_limit"] * 100),
-            "max_pct": config["concentration_limits"]["max_single_instrument_pct"],
-            "passed": ((current_instrument_exposure + notional) / config["aggregate_limit"] * 100) <= config["concentration_limits"]["max_single_instrument_pct"]
-        }
-    }
-    
-    # Overall validation result
-    all_passed = all(check["passed"] for check in checks.values())
-    
-    return {
-        "trade_allowed": all_passed,
-        "checks": checks,
-        "instrument": instrument,
-        "category": category,
-        "notional": notional
-    }
-
-# Usage example
-current_positions = {
-    "EURUSD": 300000,
-    "GBPUSD": 200000,
-    "USDJPY": 150000
-}
-
-result = validate_instrument_trade("Cust_1", "PB_A", "EURUSD", 250000, current_positions)
-print(f"Trade allowed: {result['trade_allowed']}")
-for check_name, check_result in result['checks'].items():
-    print(f"{check_name}: {check_result['current']:,} / {check_result['limit']:,} - {'PASS' if check_result['passed'] else 'FAIL'}")
-        """, language='python')
 
 elif st.session_state.nav_section == 'error_handling':
     # --- Error Handling & Edge Cases ---
