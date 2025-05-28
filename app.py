@@ -78,23 +78,13 @@ if st.sidebar.button("Error Handling", use_container_width=True):
 if st.sidebar.button("Future Extensions", use_container_width=True):
     st.session_state.nav_section = 'future'
 
-if st.sidebar.button("Trade Flow", use_container_width=True):
+if st.sidebar.button("Trade Rejection Flow", use_container_width=True):
     st.session_state.nav_section = 'trade_flow'
 
 if st.sidebar.button("Trading Simulation", use_container_width=True):
     st.session_state.nav_section = 'trading'
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("**Quick Stats:**")
-if prime_brokers_data and customers_data and sessions_data:
-    st.sidebar.write(f"Prime Brokers: {len(prime_brokers_data)}")
-    st.sidebar.write(f"Customers: {len(customers_data)}")
-    st.sidebar.write(f"Sessions: {len(sessions_data['sessions'] if sessions_data and 'sessions' in sessions_data else [])}")
-    if credit_data:
-        customer_limits = len(credit_data.get('customer_pb_limits', []))
-        pb_limits = len(credit_data.get('pb_to_central_pb_limits', []))
-        st.sidebar.write(f"Customer Limits: {customer_limits}")
-        st.sidebar.write(f"PB Credit Lines: {pb_limits}")
+
 
 # Display content based on selected section
 # Use the already loaded YAML data for interactive queries
@@ -1128,13 +1118,7 @@ print(f"Adjusted limit: ${result['adjusted_limit']:,}")
     with st.expander("Dynamic Credit Updates via API", expanded=False):
         st.markdown("Real-time credit adjustments through API endpoints")
         st.markdown("""
-        We could move beyond static YAML files to enable real-time credit updates through RESTful APIs. Vendors and risk systems could push credit changes instantly.
-        
-        **Real-time API endpoints:** We'd implement POST /api/credit/update for immediate limit changes. GET /api/credit/status for current limits and utilization. WebSocket streams for live credit notifications to trading systems.
-        
-        **Event-driven updates:** Credit changes would trigger immediate notifications to all connected trading systems. Message queues would ensure reliable delivery even during system outages. We could add automatic rollback capabilities if updates fail validation.
-        
-        **Audit and versioning:** Every credit change would create an immutable audit record. Version numbers would track configuration evolution. We'd have the ability to query historical credit states for compliance reporting.
+        This is a basic naive example of how we could implement an API using Flask for demonstration purposes.
         """)
         
         st.code("""
@@ -1470,7 +1454,7 @@ elif st.session_state.nav_section == 'trade_flow':
                 <div class="flow-step processing">
                     <div class="step-number">2</div>
                     <div class="step-content">
-                        <div class="step-title">OneChronos Receives Trade</div>
+                        <div class="step-title">ATS Receives Trade</div>
                         <div class="step-description">Platform receives FIX message and begins validation</div>
                         <div class="step-data">
                             Trade ID: TRD_789456<br>
@@ -1537,7 +1521,7 @@ elif st.session_state.nav_section == 'trade_flow':
                     <div class="step-number">6</div>
                     <div class="step-content">
                         <div class="step-title">Trade Rejection</div>
-                        <div class="step-description">OneChronos rejects trade and sends rejection</div>
+                        <div class="step-description">ATS rejects trade and sends rejection</div>
                         <div class="step-data">
                             FIX: ExecutionReport<br>
                             ExecType: Rejected (8)<br>
@@ -1592,7 +1576,7 @@ elif st.session_state.nav_section == 'trade_flow':
     """
 
     # Display the trade flow diagram
-    st.components.v1.html(trade_flow_diagram, height=600)
+    st.components.v1.html(trade_flow_diagram, height=700)
 
 elif st.session_state.nav_section == 'trading':
     # --- Trading Simulation ---
@@ -1739,7 +1723,8 @@ elif st.session_state.nav_section == 'trading':
                     utilization = (abs(exposure) / customer_limit * 100) if customer_limit > 0 else 0
                     
                     st.write(f"**{customer_id} → {pb_id}**")
-                    st.write(f"Net Position: ${exposure:,} | Credit Used: ${abs(exposure):,} / ${customer_limit:,} ({utilization:.1f}%)")
+                    st.text(f"Net Position: ${exposure:,}")
+                    st.write(f"Credit Used: ${abs(exposure):,} / ${customer_limit:,} ({utilization:.1f}%)")
                     st.progress(min(utilization / 100, 1.0))
                     st.write("---")
                 
