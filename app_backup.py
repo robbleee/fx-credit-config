@@ -78,7 +78,7 @@ if st.sidebar.button("Error Handling", use_container_width=True):
 if st.sidebar.button("Future Extensions", use_container_width=True):
     st.session_state.nav_section = 'future'
 
-if st.sidebar.button("Trade Rejection Flow/Resolution", use_container_width=True):
+if st.sidebar.button("Trade Rejection Flow", use_container_width=True):
     st.session_state.nav_section = 'trade_flow'
 
 if st.sidebar.button("Trading Simulation", use_container_width=True):
@@ -1475,36 +1475,6 @@ elif st.session_state.nav_section == 'trade_flow':
 
     # Display the trade flow diagram
     st.components.v1.html(trade_flow_diagram, height=700)
-
-    # --- Trade Reject Resolution ---
-    st.header("Trade Reject Resolution")
-    st.markdown("""
-    Handling real-time trade rejects for "Customer to PB Credit Limit Exceeded" - verification steps and remediation process.
-    """)
-
-    with st.expander("1 - Verify Limit Breach", expanded=True):
-        st.markdown("Steps to confirm the credit limit that was breached")
-        st.markdown("""
-        **Immediate verification:** We should immediately query our current credit configuration to confirm the exact limit that was breached. We need to check both the configured limit amount and current utilization, and verify the timestamp of the reject against any recent credit updates that might have occurred.
-        
-        **Audit trail verification:** We should check our database audit trail to confirm the exact credit limit that was active at the time of the rejected trade. This is critical because credit limits may have changed between the trade attempt and our investigation. We need to query the credit history table with the exact timestamp of the trade rejection to be absolutely certain.
-        
-        **Data sources we should check:** We should look at our current credit_data.yaml or database for the customer-PB limit. We need to check our real-time position system for current exposure calculation. We should review recent trade history to understand what pushed the customer over the limit. We must also check our credit limit audit trail for historical limits at the exact trade time.
-        
-        **Key questions we need to answer:** What was the exact credit limit at the time of the rejected trade? What is the current utilized amount? What was the trade size that caused the breach? Are there any pending trades that haven't settled yet that we should account for? Have there been any credit limit changes since the trade attempt that we need to be aware of?
-        """)
-
-    with st.expander("2 - Customer Communication", expanded=True):
-        st.markdown("Immediate communication steps with the customer")
-        st.markdown("""
-        **Immediate notification:** We should contact the customer within 5 minutes of the reject via phone and email. We need to provide specific details: the rejected trade size, their current limit, and current utilization. We should explain exactly how much additional credit would be needed to execute their trade.
-        
-        **Information we should provide:** We need to give them their current credit limit amount and utilization percentage. We should provide specific details about the trade that was rejected. We need to explain the available options for resolution (temporary increase, reduce positions, etc.) and give them realistic timelines for different resolution options.
-        
-        **Prime Broker coordination:** We should immediately contact the Prime Broker to discuss potential solutions and get their input on temporary credit increases. The PB may have additional context on the customer's creditworthiness, recent trading patterns, or willingness to extend temporary credit. We need to remember that PB approval is typically required for any credit limit adjustments, so we should coordinate with them early in the process.
-        
-        **Customer options we can offer:** We can help them request a temporary credit increase (if justified by market conditions and approved by PB). We should suggest they reduce existing positions to free up credit capacity. We can offer to split their large trade into smaller sizes that fit within their remaining limit. We should let them know they can wait for existing trades to settle and free up credit naturally.
-        """)
 
 elif st.session_state.nav_section == 'trading':
     # --- Trading Simulation ---
